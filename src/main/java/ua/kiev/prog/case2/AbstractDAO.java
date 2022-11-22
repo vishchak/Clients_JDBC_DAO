@@ -173,6 +173,41 @@ public abstract class AbstractDAO<T> {
         }
     }
 
+    public List<T> getAll(Class<T> cls, String... strings) {
+        List<T> res = new ArrayList<>();
+        StringBuilder sb = new StringBuilder();
+        for (String st :
+                strings) {
+            sb.append(st).append(",");
+        }
+        sb.deleteCharAt(sb.length() - 1);
+        try {
+            try (Statement st = conn.createStatement()) {
+                try (ResultSet rs = st.executeQuery("SELECT " + sb.toString() + " FROM " + table)) {
+                    ResultSetMetaData md = rs.getMetaData();
+
+                    while (rs.next()) {
+                        T t = cls.newInstance(); //!!!
+
+                        for (int i = 1; i <= md.getColumnCount(); i++) {
+                            String columnName = md.getColumnName(i);
+                            Field field = cls.getDeclaredField(columnName);
+                            field.setAccessible(true);
+
+                            field.set(t, rs.getObject(columnName));
+                        }
+
+                        res.add(t);
+                    }
+                }
+            }
+
+            return res;
+        } catch (Exception ex) {
+            throw new RuntimeException(ex);
+        }
+    }
+
     private Field getPrimaryKeyField(T t, Field[] fields) {
         Field result = null;
 
