@@ -63,13 +63,12 @@ public abstract class AbstractDAO<T> {
 
             StringBuilder names = new StringBuilder();
             StringBuilder values = new StringBuilder();
-
-            // insert into t (id,name,age) values("..",..
+            StringBuilder namesValues = new StringBuilder();
 
             for (Field f : fields) {
                 if (f != id) {
                     f.setAccessible(true);
-
+                    namesValues.append(f.getName()).append(" = '").append(f.get(t)).append("' AND ");
                     names.append(f.getName()).append(',');
                     values.append('"').append(f.get(t)).append("\",");
                 }
@@ -77,6 +76,9 @@ public abstract class AbstractDAO<T> {
 
             names.deleteCharAt(names.length() - 1); // last ','
             values.deleteCharAt(values.length() - 1);
+            for (int i = 0; i < 5; i++) {
+                namesValues.deleteCharAt(namesValues.length() - 1);
+            }
 
             String sql = "INSERT INTO " + table + "(" + names.toString() +
                     ") VALUES(" + values.toString() + ")";
@@ -85,13 +87,30 @@ public abstract class AbstractDAO<T> {
                 st.execute(sql);
             }
 
-            // TODO: get ID
-            // SELECT - X
+            setID(t, id, String.valueOf(namesValues));
 
         } catch (Exception ex) {
             throw new RuntimeException(ex);
         }
     }
+
+    public void setID(T t, Field id, String namesValues) throws SQLException, NoSuchFieldException, IllegalAccessException {
+        try (Statement st = conn.createStatement()) {
+            ResultSet rs = st.executeQuery("SELECT " + id.getName() + " FROM " + table + " WHERE " + namesValues.toString());
+            ResultSetMetaData md = rs.getMetaData();
+            Class<?> cls = t.getClass();
+            while (rs.next()) {
+                for (int i = 1; i <= md.getColumnCount(); i++) {
+                    String columnName = md.getColumnName(i);
+                    Field field = cls.getDeclaredField(columnName);
+                    field.setAccessible(true);
+
+                    field.set(t, rs.getObject(columnName));
+                }
+            }
+        }
+    }
+
 
     public void update(T t) {
         try {
